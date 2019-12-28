@@ -192,7 +192,9 @@ public class OpenAPIBuilder {
         // info
         AnnotationsUtils.getInfo(apiDef.info()).ifPresent(openAPI::setInfo);
         // OpenApiDefinition security requirements
-        securityParser.getSecurityRequirements(apiDef.security()).ifPresent(openAPI::setSecurity);
+        if(apiDef.security().length > 0) {
+            securityParser.getSecurityRequirements(apiDef.security()).ifPresent(openAPI::setSecurity);
+        }
         // OpenApiDefinition external docs
         AnnotationsUtils.getExternalDocumentation(apiDef.externalDocs()).ifPresent(openAPI::setExternalDocs);
         // OpenApiDefinition tags

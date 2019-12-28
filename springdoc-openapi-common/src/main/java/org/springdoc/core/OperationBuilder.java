@@ -82,8 +82,9 @@ public class OperationBuilder {
         buildResponse(components, apiOperation, operation, methodAttributes);
 
         // security
-        securityParser.buildSecurityRequirement(apiOperation.security(), operation);
-
+        if(apiOperation.security().length > 0) {
+            securityParser.buildSecurityRequirement(apiOperation.security(), operation);
+        }
         // Extensions in Operation
         buildExtensions(apiOperation, operation);
         return openAPI;

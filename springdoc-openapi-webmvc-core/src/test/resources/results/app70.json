@@ -19,12 +19,61 @@
     }
   ],
   "paths": {
-    "/secure": {
+    "/public/secure": {
       "get": {
         "tags": [
-          "controller"
+          "public-controller"
         ],
-        "operationId": "secured",
+        "description": "Security overridden on the class level, and then on the method level",
+        "operationId": "secure",
+        "responses": {
+          "200": {
+            "description": "default response",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer-jwt": []
+          }
+        ]
+      }
+    },
+    "/public/public": {
+      "get": {
+        "tags": [
+          "public-controller"
+        ],
+        "description": "Security overridden on the class level",
+        "operationId": "open",
+        "responses": {
+          "200": {
+            "description": "default response",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/secure/secure": {
+      "get": {
+        "tags": [
+          "secure-controller"
+        ],
+        "description": "Inherited global security",
+        "operationId": "secure_1",
         "responses": {
           "200": {
             "description": "default response",
@@ -39,12 +88,13 @@
         }
       }
     },
-    "/open": {
+    "/secure/public": {
       "get": {
         "tags": [
-          "controller"
+          "secure-controller"
         ],
-        "operationId": "open",
+        "description": "Overridden global security",
+        "operationId": "open_1",
         "responses": {
           "200": {
             "description": "default response",

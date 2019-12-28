@@ -7,10 +7,11 @@ import io.swagger.v3.oas.annotations.security.OAuthScope;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.security.*;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.method.HandlerMethod;
 
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Collectors;
 
 class SecurityParser {
 
@@ -48,53 +49,51 @@ class SecurityParser {
         return result;
     }
 
-    public Optional<io.swagger.v3.oas.annotations.security.SecurityRequirement[]> getSecurityRequirements(
-            HandlerMethod method) {
-        // class SecurityRequirements
-        io.swagger.v3.oas.annotations.security.SecurityRequirements classSecurity = ReflectionUtils
-                .getAnnotation(method.getBeanType(), io.swagger.v3.oas.annotations.security.SecurityRequirements.class);
-        // method SecurityRequirements
-        io.swagger.v3.oas.annotations.security.SecurityRequirements methodSecurity = ReflectionUtils
-                .getAnnotation(method.getMethod(), io.swagger.v3.oas.annotations.security.SecurityRequirements.class);
+    public Optional<io.swagger.v3.oas.annotations.security.SecurityRequirement[]> getSecurityRequirements(HandlerMethod method) {
+        return getMethodAnnotations(method).map(Optional::of)
+                .orElseGet(() -> getClassAnnotations(method))
+                .map(list -> list.toArray(new io.swagger.v3.oas.annotations.security.SecurityRequirement[0]));
+    }
 
-        Set<io.swagger.v3.oas.annotations.security.SecurityRequirement> allSecurityTags = new HashSet<>();
+    private Optional<List<io.swagger.v3.oas.annotations.security.SecurityRequirement>> getClassAnnotations(HandlerMethod method) {
+        return getSecurityRequirements(method.getBeanType())
+                .map(s -> Arrays.asList(s.value())).map(Optional::of)
+                .orElseGet(() -> getRepeatableSecurityRequirement(method.getBeanType()).filter(list -> !list.isEmpty()));
+    }
 
-        if (classSecurity != null) {
-            allSecurityTags.addAll(Arrays.asList(classSecurity.value()));
-        }
-        if (methodSecurity != null) {
-            allSecurityTags.addAll(Arrays.asList(methodSecurity.value()));
-        }
+    private Optional<List<io.swagger.v3.oas.annotations.security.SecurityRequirement>> getMethodAnnotations(HandlerMethod method) {
+        return getSecurityRequirements(method.getMethod())
+                .map(s -> Arrays.asList(s.value())).map(Optional::of)
+                .orElseGet(() -> getRepeatableSecurityRequirement(method.getMethod()).filter(list -> !list.isEmpty()));
+    }
 
-        if (allSecurityTags.isEmpty()) {
-            // class SecurityRequirement
-            List<io.swagger.v3.oas.annotations.security.SecurityRequirement> securityRequirementsClassList = ReflectionUtils
-                    .getRepeatableAnnotations(method.getBeanType(),
-                            io.swagger.v3.oas.annotations.security.SecurityRequirement.class);
-            // method SecurityRequirement
-            List<io.swagger.v3.oas.annotations.security.SecurityRequirement> securityRequirementsMethodList = ReflectionUtils
-                    .getRepeatableAnnotations(method.getMethod(),
-                            io.swagger.v3.oas.annotations.security.SecurityRequirement.class);
-            if (!CollectionUtils.isEmpty(securityRequirementsClassList)) {
-                allSecurityTags.addAll(securityRequirementsClassList);
-            }
-            if (!CollectionUtils.isEmpty(securityRequirementsMethodList)) {
-                allSecurityTags.addAll(securityRequirementsMethodList);
-            }
-        }
+    private static Optional<io.swagger.v3.oas.annotations.security.SecurityRequirements> getSecurityRequirements(Class<?> clazz) {
+        return Optional.ofNullable(
+                ReflectionUtils.getAnnotation(clazz, io.swagger.v3.oas.annotations.security.SecurityRequirements.class));
+    }
 
-        if (allSecurityTags.isEmpty()) {
-            return Optional.empty();
-        }
+    private static Optional<List<io.swagger.v3.oas.annotations.security.SecurityRequirement>> getRepeatableSecurityRequirement(Class<?> clazz) {
+        return Optional.ofNullable(
+                ReflectionUtils.getRepeatableAnnotations(clazz, io.swagger.v3.oas.annotations.security.SecurityRequirement.class));
+    }
 
-        return Optional.of(
-                allSecurityTags.toArray(new io.swagger.v3.oas.annotations.security.SecurityRequirement[0]));
+    private static Optional<io.swagger.v3.oas.annotations.security.SecurityRequirements> getSecurityRequirements(Method method) {
+        return Optional.ofNullable(
+                ReflectionUtils.getAnnotation(method, io.swagger.v3.oas.annotations.security.SecurityRequirements.class));
+    }
+
+    private static Optional<List<io.swagger.v3.oas.annotations.security.SecurityRequirement>> getRepeatableSecurityRequirement(Method method) {
+        return Optional.ofNullable(
+                ReflectionUtils.getRepeatableAnnotations(method, io.swagger.v3.oas.annotations.security.SecurityRequirement.class));
     }
 
     public Optional<List<SecurityRequirement>> getSecurityRequirements(
             io.swagger.v3.oas.annotations.security.SecurityRequirement[] securityRequirementsApi) {
-        if (securityRequirementsApi == null || securityRequirementsApi.length == 0) {
+        if (securityRequirementsApi == null) {
             return Optional.empty();
+        }
+        if(securityRequirementsApi.length == 0) {
+            return Optional.of(Collections.emptyList());
         }
         List<SecurityRequirement> securityRequirements = new ArrayList<>();
         for (io.swagger.v3.oas.annotations.security.SecurityRequirement securityRequirementApi : securityRequirementsApi) {
@@ -170,9 +169,8 @@ class SecurityParser {
     public void buildSecurityRequirement(
             io.swagger.v3.oas.annotations.security.SecurityRequirement[] securityRequirements, Operation operation) {
         Optional<List<SecurityRequirement>> requirementsObject = this.getSecurityRequirements(securityRequirements);
-        requirementsObject.ifPresent(requirements -> requirements.stream()
-                .filter(r -> operation.getSecurity() == null || !operation.getSecurity().contains(r))
-                .forEach(operation::addSecurityItem));
+        requirementsObject.ifPresent(requirements ->
+                operation.setSecurity(requirements.stream().distinct().collect(Collectors.toList())));
     }
 
     private Optional<OAuthFlows> getOAuthFlows(io.swagger.v3.oas.annotations.security.OAuthFlows oAuthFlows) {
